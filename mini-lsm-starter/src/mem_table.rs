@@ -8,6 +8,7 @@ use std::sync::Arc;
 use anyhow::Result;
 use bytes::Bytes;
 use crossbeam_skiplist::SkipMap;
+use nom::AsBytes;
 use ouroboros::self_referencing;
 
 use crate::iterators::StorageIterator;
@@ -38,7 +39,12 @@ pub(crate) fn map_bound(bound: Bound<&[u8]>) -> Bound<Bytes> {
 impl MemTable {
     /// Create a new mem-table.
     pub fn create(_id: usize) -> Self {
-        unimplemented!()
+        return MemTable {
+            map: Arc::new(SkipMap::new()),
+            wal: None,
+            id: _id,
+            approximate_size: Arc::new(AtomicUsize::new(0)),
+        };
     }
 
     /// Create a new mem-table with WAL
@@ -69,7 +75,11 @@ impl MemTable {
 
     /// Get a value by key.
     pub fn get(&self, _key: &[u8]) -> Option<Bytes> {
-        unimplemented!()
+        // 不存在返回空的Bytes
+        if let Some(v) = self.map.get(&Bytes::copy_from_slice(_key)) {
+            return Some(v.value().clone());
+        }
+        Some(Bytes::from_static("".as_bytes()))
     }
 
     /// Put a key-value pair into the mem-table.
@@ -78,7 +88,13 @@ impl MemTable {
     /// In week 2, day 6, also flush the data to WAL.
     /// In week 3, day 5, modify the function to use the batch API.
     pub fn put(&self, _key: &[u8], _value: &[u8]) -> Result<()> {
-        unimplemented!()
+        self.map
+            .insert(Bytes::copy_from_slice(_key), Bytes::copy_from_slice(_value));
+        self.approximate_size.fetch_add(
+            _key.len() + _value.len(),
+            std::sync::atomic::Ordering::Release,
+        );
+        Ok(())
     }
 
     /// Implement this in week 3, day 5.
