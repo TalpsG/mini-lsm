@@ -109,9 +109,13 @@ fn test_task3_freeze_on_capacity() {
     }
     let num_imm_memtables = storage.state.read().imm_memtables.len();
     assert!(num_imm_memtables >= 1, "no memtable frozen?");
+    let mut size = storage.state.read().memtable.approximate_size();
+    println!("{size}");
     for _ in 0..1000 {
         storage.delete(b"1").unwrap();
     }
+    size = storage.state.read().memtable.approximate_size();
+    println!("{size}");
     assert!(
         storage.state.read().imm_memtables.len() > num_imm_memtables,
         "no more memtable frozen?"

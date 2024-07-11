@@ -79,7 +79,7 @@ impl MemTable {
         if let Some(v) = self.map.get(&Bytes::copy_from_slice(_key)) {
             return Some(v.value().clone());
         }
-        Some(Bytes::from_static("".as_bytes()))
+        None
     }
 
     /// Put a key-value pair into the mem-table.
