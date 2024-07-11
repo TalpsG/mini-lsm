@@ -1,5 +1,6 @@
 #![allow(dead_code)] // REMOVE THIS LINE after fully implementing this functionality
 
+use std::borrow::{Borrow, BorrowMut};
 use std::ops::Bound;
 use std::path::Path;
 use std::sync::atomic::AtomicUsize;
@@ -12,7 +13,7 @@ use nom::AsBytes;
 use ouroboros::self_referencing;
 
 use crate::iterators::StorageIterator;
-use crate::key::KeySlice;
+use crate::key::{Key, KeySlice};
 use crate::table::SsTableBuilder;
 use crate::wal::Wal;
 
@@ -111,7 +112,13 @@ impl MemTable {
 
     /// Get an iterator over a range of keys.
     pub fn scan(&self, _lower: Bound<&[u8]>, _upper: Bound<&[u8]>) -> MemTableIterator {
-        unimplemented!()
+        let mut iter = MemTableIterator::new(
+            self.map.clone(),
+            |map| map.range((map_bound(_lower), map_bound(_upper))),
+            (Bytes::new(), Bytes::new()),
+        );
+        let _ = iter.next();
+        iter
     }
 
     /// Flush the mem-table to SSTable. Implement in week 1 day 6.
@@ -157,18 +164,24 @@ impl StorageIterator for MemTableIterator {
     type KeyType<'a> = KeySlice<'a>;
 
     fn value(&self) -> &[u8] {
-        unimplemented!()
+        self.borrow_item().1.as_bytes().as_ref()
     }
 
     fn key(&self) -> KeySlice {
-        unimplemented!()
+        KeySlice::from_slice(self.borrow_item().0.as_bytes())
     }
 
     fn is_valid(&self) -> bool {
-        unimplemented!()
+        !self.borrow_item().0.is_empty()
     }
 
     fn next(&mut self) -> Result<()> {
-        unimplemented!()
+        self.with_mut(|values| {
+            match values.iter.next() {
+                Some(ent) => *values.item = (ent.key().clone(), ent.value().clone()),
+                None => *values.item = (Bytes::new(), Bytes::new()),
+            };
+        });
+        Ok(())
     }
 }
